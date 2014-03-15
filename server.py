@@ -25,7 +25,7 @@ class ThreadingTCPServer(object):
 
     def __init__(self, server_address, RequestHandler):
         """
-        :param server_address: a tuple (HOST, PORT)
+        :param server_address: a pair (host, port)
         :param RequestHandler: request handler class
         """
         self.server_address = server_address
@@ -73,5 +73,5 @@ class ThreadingTCPServer(object):
 
     def _thread_process_request(self, request, client_address):
         """Worker thread"""
-        self.RequestHandlerClass(request, client_address, self)
+        self.RequestHandlerClass(request, client_address)
         request.close()
