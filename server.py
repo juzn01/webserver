@@ -51,7 +51,7 @@ class ThreadingTCPServer(object):
 
     def handle_request(self):
         try:
-            request, client_address = self.get_request()
+            request, client_address = self.socket.accept()
         except socket.error:
             return
         try:
