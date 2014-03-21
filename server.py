@@ -47,7 +47,7 @@ class ThreadingTCPServer(object):
         while True:
             r, w, e = _eintr_retry(select.select, [self.socket.fileno()],
                                    [], [], poll_interval)
-            if self in r:
+            if self.socket.fileno() in r:
                 self.handle_request()
 
     def handle_request(self):
