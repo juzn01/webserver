@@ -43,7 +43,12 @@ class ThreadingTCPServer(object):
         Use `select` system call (with `poll_interval` argument) to get ready
         sockets without blocking
         """
-
+        addr = self.server_address[0]
+        port = self.server_address[1]
+        if not self.server_address[0]:
+            addr = '0.0.0.0'
+        msg = 'Starting sever bound to %s: %d\n' % (addr, port)
+        sys.stderr.write(msg)
         while True:
             r, w, e = _eintr_retry(select.select, [self.socket.fileno()],
                                    [], [], poll_interval)
@@ -57,19 +62,20 @@ class ThreadingTCPServer(object):
             return
         try:
             self.process_request(request, client_address)
-        except:
+        except Exception, e:
+            raise e
             self.handle_error(client_address)
             request.close()
 
     def handle_error(self, client_address):
-        msg = 'Error processing request from %s, %d' % client_address
+        msg = 'Error processing request from %s, %d\n' % client_address
         sys.stderr.write(msg)
 
     def process_request(self, request, client_address):
         """Process requests in threads"""
         t = threading.Thread(target=self._thread_process_request,
-                             args=(request, client_address),
-                             daemon=False)
+                             args=(request, client_address))
+        t.daemon = False
         t.start()
 
     def _thread_process_request(self, request, client_address):

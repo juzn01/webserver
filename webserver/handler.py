@@ -5,7 +5,7 @@ class ConnectionHandler(object):
         self.client_address = client_address
 
         # File object to read data from the socket's fd after dup()
-        self.received = self.conncetion.makefile('rb')  # Buffered (default)
+        self.received = self.connection.makefile('rb')  # Buffered (default)
         # File object to write data to the socket's fd after dup()
         self.sent = self.connection.makefile('wb', 0)  # Unbuffered
 
@@ -17,3 +17,15 @@ class ConnectionHandler(object):
 
     def handle(self):
         pass
+
+
+class HTTPRequestHandler(ConnectionHandler):
+
+    def handle(self):
+        r = self.received.readline()
+        print r
+        status_line = 'HTTP/1.1 200 OK\r\n'
+        self.sent.write(status_line)
+        data = '<html>OK</html>'
+        self.sent.write(data)
+        self.sent.flush()
