@@ -74,5 +74,5 @@ class ThreadingTCPServer(object):
 
     def _thread_process_request(self, request, client_address):
         """Worker thread"""
-        self.RequestHandlerClass(request, client_address)
+        self.RequestHandler(request, client_address)
         request.close()
