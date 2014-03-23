@@ -12,7 +12,7 @@ assertIn ()
 port_number="8080"
 
 # Start the server
-./run.py &
+./run.py 2>/dev/null &
 
 # Wait for the server to fully start
 sleep 1 
