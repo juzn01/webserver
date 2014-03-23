@@ -33,8 +33,15 @@ class ThreadingTCPServer(object):
         self.RequestHandler = RequestHandler
         self.socket = socket.socket(self.address_family,
                                     self.socket_type)
+
+        # Set SO_REUSEADDR
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(self.server_address)
         self.socket.listen(self.backlog)
+
+        # Meta information
+        self._addr = self.server_address[0].strip() or '0.0.0.0'
+        self._port = self.server_address[1]
 
     def start(self, poll_interval=0.5):
         """
@@ -43,11 +50,7 @@ class ThreadingTCPServer(object):
         Use `select` system call (with `poll_interval` argument) to get ready
         sockets without blocking
         """
-        addr = self.server_address[0]
-        port = self.server_address[1]
-        if not self.server_address[0]:
-            addr = '0.0.0.0'
-        msg = 'Starting sever bound to %s: %d\n' % (addr, port)
+        msg = 'Starting sever bound to %s:%d\n' % (self._addr, self._port)
         sys.stderr.write(msg)
         while True:
             r, w, e = _eintr_retry(select.select, [self.socket.fileno()],
@@ -61,6 +64,7 @@ class ThreadingTCPServer(object):
         except socket.error:
             return
         try:
+            # Dispatch the request to a thread
             self.process_request(request, client_address)
         except Exception, e:
             raise e
@@ -68,7 +72,7 @@ class ThreadingTCPServer(object):
             request.close()
 
     def handle_error(self, client_address):
-        msg = 'Error processing request from %s, %d\n' % client_address
+        msg = 'Error processing request from %s:%d\n' % client_address
         sys.stderr.write(msg)
 
     def process_request(self, request, client_address):
@@ -80,5 +84,8 @@ class ThreadingTCPServer(object):
 
     def _thread_process_request(self, request, client_address):
         """Worker thread"""
-        self.RequestHandler(request, client_address)
+        try:
+            self.RequestHandler(request, client_address)
+        except:
+            self.handle_error(client_address)
         request.close()
