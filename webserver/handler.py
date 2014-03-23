@@ -1,6 +1,14 @@
+import cgi
 import mimetools
+import os
+import shutil
 import socket
 import sys
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+import urllib
 from webserver import __version__
 
 
@@ -31,12 +39,95 @@ class HTTPRequestHandler(ConnectionHandler):
     http_version = 'HTTP/1.1'  # Default supported HTTP version
     server_version = 'Webserver/' + __version__
     supported_http_versions = ('HTTP/1.0', 'HTTP/1.1')
+    index_files = ('index.html', 'index.htm')
+    default_content_type = 'text/html'
 
     def do_GET(self):
-        pass
+        f = self.send_head()
+        if f:
+            try:
+                shutil.copyfileobj(f, self.sent)
+            finally:
+                f.close()
 
     def do_HEAD(self):
-        pass
+        f = self.send_head()
+        if f:
+            f.close()
+
+    def send_head(self):
+        """Send response status line and headers, and return a file object"""
+        absolute_path = self.get_path()
+        if os.path.isdir(absolute_path):
+            if not self.path.endswith('/'):
+                # Redirect the browser appending an ending slash
+                self.send_response(301)
+                self.send_header('Location', self.path + '/')
+                self.end_headers()
+                return
+            for index_file in self.index_files:
+                index = os.path.join(absolute_path, index_file)
+                if os.path.exists(index):
+                    absolute_path = index
+                    break
+            else:
+                return self.list_directory()
+        try:
+            f = open(absolute_path, 'rb')
+        except IOError:
+            self.send_error(404)
+            return
+        try:
+            self.send_header("Content-type", self.default_content_type)
+            fs = os.fstat(f.fileno())
+            self.send_header("Content-Length", str(fs[6]))
+            self.end_headers()
+            return f
+        except:
+            raise
+            f.close()
+
+    def list_directory(self, path):
+        try:
+            file_list = os.listdir(path)
+        except os.error:
+            self.send_error(404)
+            return
+        file_list.sort(key=lambda a: a.lower())
+        f = StringIO()
+        dpath = cgi.escape(urllib.unquote(self.path))
+        f.write('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
+        f.write("<html>\n<title>Directory listing for %s</title>\n" % dpath)
+        f.write("<body>\n<h2>Directory listing for %s</h2>\n" % dpath)
+        f.write("<hr>\n<ul>\n")
+        for name in file_list:
+            fullname = os.path.join(path, name)
+            displayname = linkname = name
+            # Append / for directories or @ for symbolic links
+            if os.path.isdir(fullname):
+                displayname = name + "/"
+                linkname = name + "/"
+            if os.path.islink(fullname):
+                displayname = name + "@"
+                # Note: a link to a directory displays with @ and links with /
+            f.write('<li><a href="%s">%s</a>\n'
+                    % (urllib.quote(linkname), cgi.escape(displayname)))
+        f.write("</ul>\n<hr>\n</body>\n</html>\n")
+        length = f.tell()
+        f.seek(0)
+        self.send_response(200)
+        self.send_header("Content-type", self.default_content_type)
+        self.send_header("Content-Length", str(length))
+        self.end_headers()
+        return f
+
+    def get_path(self):
+        """
+        Get the absolute path of the requested resource (file or directory)
+        """
+        relative_path = self.path.lstrip('/')
+        absolute_path = os.path.join(os.getcwd(), relative_path)
+        return absolute_path
 
     def handle_request(self):
         """Handle a specific request and log error if any"""
@@ -212,4 +303,4 @@ class HTTPRequestHandler(ConnectionHandler):
         504: ('Gateway Timeout',
               'The gateway server did not receive a timely response'),
         505: ('HTTP Version Not Supported', 'Cannot fulfill request.'),
-        }
+    }
