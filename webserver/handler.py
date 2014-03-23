@@ -1,6 +1,7 @@
 import cgi
-import mimetools
+import mimetypes
 import os
+import rfc822
 import shutil
 import socket
 import sys
@@ -40,7 +41,7 @@ class HTTPRequestHandler(ConnectionHandler):
     server_version = 'Webserver/' + __version__
     supported_http_versions = ('HTTP/1.0', 'HTTP/1.1')
     index_files = ('index.html', 'index.htm')
-    default_content_type = 'text/html'
+    default_content_type = 'text/plain'
 
     def do_GET(self):
         f = self.send_head()
@@ -71,14 +72,16 @@ class HTTPRequestHandler(ConnectionHandler):
                     absolute_path = index
                     break
             else:
-                return self.list_directory()
+                return self.list_directory(absolute_path)
         try:
             f = open(absolute_path, 'rb')
         except IOError:
             self.send_error(404)
             return
         try:
-            self.send_header("Content-type", self.default_content_type)
+            content_type = self.get_mime_type(absolute_path)
+            self.send_response(200)
+            self.send_header("Content-type", content_type)
             fs = os.fstat(f.fileno())
             self.send_header("Content-Length", str(fs[6]))
             self.end_headers()
@@ -86,6 +89,9 @@ class HTTPRequestHandler(ConnectionHandler):
         except:
             raise
             f.close()
+
+    def get_mime_type(self, absolute_path):
+        return mimetypes.guess_type(absolute_path)[0]
 
     def list_directory(self, path):
         try:
@@ -116,7 +122,7 @@ class HTTPRequestHandler(ConnectionHandler):
         length = f.tell()
         f.seek(0)
         self.send_response(200)
-        self.send_header("Content-type", self.default_content_type)
+        self.send_header("Content-type", 'text/html')
         self.send_header("Content-Length", str(length))
         self.end_headers()
         return f
@@ -133,7 +139,6 @@ class HTTPRequestHandler(ConnectionHandler):
         """Handle a specific request and log error if any"""
         try:
             request_line = self.received.readline().rstrip('\r\n')
-
             # Request line is empty
             if not request_line:
                 self.log_error('Empty request line')
@@ -149,6 +154,7 @@ class HTTPRequestHandler(ConnectionHandler):
                 # Unsupported HTTP method
                 self.send_error(501)
                 return
+
             method = getattr(self, method_func)
             # Call this method function
             method()
@@ -177,11 +183,15 @@ class HTTPRequestHandler(ConnectionHandler):
         self.request_version = request_version
 
         # Get optional headers
-        self.headers = mimetools.Message(self.received, 0)
-        connection_type = self.headers('Connection', '')
+        # Must use rfc822 or mimetools instead of email package, because
+        # `self.received` must be received using readline() method instead
+        # of read() which will block until the other end (client) closed the
+        # connection
+        self.headers = rfc822.Message(self.received, 0)
+        connection_type = self.headers.get('Connection', '')
         if connection_type.lower() == 'close':
             self.close_connection = True
-        elif (connection_type.lower() == 'keep-alive' and
+        elif (connection_type.lower() == 'keep-alive' or
               self.request_version == 'HTTP/1.1'):
             self.close_connection = False
         return True
