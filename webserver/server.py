@@ -44,7 +44,7 @@ class ThreadingTCPServer(object):
         self._addr = self.server_address[0].strip() or '0.0.0.0'
         self._port = self.server_address[1]
 
-    def start(self, poll_interval=0.5):
+    def start(self, timeout=0.5):
         """
         Start the server
 
@@ -59,7 +59,7 @@ class ThreadingTCPServer(object):
             # pdb.set_trace()
             # print count
             r, w, e = _eintr_retry(select.select, [self.socket.fileno()],
-                                   [], [], 1.0)
+                                   [], [], timeout)
             if self.socket.fileno() in r:
                 self.handle_request()
                 count += 1
@@ -95,6 +95,6 @@ class ThreadingTCPServer(object):
         """Worker thread"""
         try:
             self.RequestHandler(request, client_address)
-        except: 
+        except:
             self.handle_error(client_address)
         request.close()
