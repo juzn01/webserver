@@ -30,15 +30,77 @@ class HTTPRequestHandler(ConnectionHandler):
 
     http_version = 'HTTP/1.1'  # Default supported HTTP version
     server_version = 'Webserver/' + __version__
+    supported_http_versions = ('HTTP/1.0', 'HTTP/1.1')
+
+    def do_GET(self):
+        pass
+
+    def do_HEAD(self):
+        pass
 
     def handle_request(self):
-        request_line = self.received.readline().rstrip('\r\n')
-        command, path, http_version = request_line.split()
+        """Handle a specific request and log error if any"""
+        try:
+            request_line = self.received.readline().rstrip('\r\n')
+
+            # Request line is empty
+            if not request_line:
+                self.log_error('Empty request line')
+                self.close_connection = True
+                return
+
+            self.request_line = request_line
+            if not self.parse_request():
+                return
+
+            method_func = 'do_' + self.method
+            if not hasattr(self, method_func):
+                # Unsupported HTTP method
+                self.send_error(501)
+                return
+            method = getattr(self, method_func)
+            # Call this method function
+            method()
+
+        except socket.timeout:
+            self.log_error('Request timeout')
+            self.close_connection = True
+
+    def parse_request(self):
+        """
+        Parse a specific request and send error if any
+        Return False if error occurs; True if success
+        """
+        try:
+            method, path, request_version = self.request_line.split()
+        except:
+            # Bad request syntax
+            self.send_error(400)
+            return False
+        if request_version not in self.supported_http_versions:
+            self.send_error(505)
+            return False
+
+        self.method = method
+        self.path = path
+        self.request_version = request_version
+
+        # Get optional headers
+        self.headers = mimetools.Message(self.received, 0)
+        connection_type = self.headers('Connection', '')
+        if connection_type.lower() == 'close':
+            self.close_connection = True
+        elif (connection_type.lower() == 'keep-alive' and
+              self.request_version == 'HTTP/1.1'):
+            self.close_connection = False
+        return True
 
     def handle(self):
-        r = self.received.readline()
-        self.send_error(404)
-        #self.sent.flush()
+        """Handle the request one at a time or keep-alive (loop)"""
+        self.close_connection = True
+        self.handle_request()
+        while not self.close_connection:
+            self.handle_request()
 
     def send_response(self, code):
         self.log_request(code)
@@ -54,9 +116,9 @@ class HTTPRequestHandler(ConnectionHandler):
         # Close or keep connection depending on header
         if name.lower() == 'connection':
             if value.lower() == 'close':
-                self.close_connection = 1
+                self.close_connection = True
             elif value.lower() == 'keep-alive':
-                self.close_connection = 0
+                self.close_connection = False
 
     def end_headers(self):
         self.sent.write('\r\n')
@@ -69,11 +131,20 @@ class HTTPRequestHandler(ConnectionHandler):
 
     def log_request(self, code):
         """
-        Log every request upon sending response
-            client_address, code, message
+        Log every request upon sending response in the following format:
+
+            `client_address`, `code`, `message`
+
         """
         msg = '%s %d %s\n' % (self.client_address[0], code,
                               self.status_codes[code][0])
+        sys.stderr.write(msg)
+
+    def log_error(self, message):
+        """
+        Log error without sending response
+        """
+        msg = '%s %s\n' % (self.client_address[0], message)
         sys.stderr.write(msg)
 
     # RFC 2616
