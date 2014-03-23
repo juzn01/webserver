@@ -25,7 +25,7 @@ assertIn "200" "$curl_output"
 [ "$?" -ne 0 ] && exit 1
 
 # Test persistent connection
-for i in {1..8}
+for i in {1..10}
 do
     ( curl -s -o /dev/null 127.0.0.1:$port_number & )
 done
