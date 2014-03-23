@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import errno
-import os
 import select
 import socket
 import sys
@@ -58,7 +57,7 @@ class ThreadingTCPServer(object):
         while True:
             # import pdb
             # pdb.set_trace()
-            print count
+            # print count
             r, w, e = _eintr_retry(select.select, [self.socket.fileno()],
                                    [], [], 1.0)
             if self.socket.fileno() in r:
@@ -96,7 +95,6 @@ class ThreadingTCPServer(object):
         """Worker thread"""
         try:
             self.RequestHandler(request, client_address)
-        except Exception, e:
-            #raise e
+        except: 
             self.handle_error(client_address)
         request.close()

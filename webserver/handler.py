@@ -138,10 +138,11 @@ class HTTPRequestHandler(ConnectionHandler):
     def handle_request(self):
         """Handle a specific request and log error if any"""
         try:
+            # Keep-Alive connections will block here for new request (line)
+            print 'block'
             request_line = self.received.readline().rstrip('\r\n')
-            # Request line is empty
+            # Request line is empty (sent by client to close connection)
             if not request_line:
-                self.log_error('Empty request line')
                 self.close_connection = True
                 return
 
@@ -201,6 +202,7 @@ class HTTPRequestHandler(ConnectionHandler):
         self.close_connection = True
         self.handle_request()
         while not self.close_connection:
+            print 'alive'
             self.handle_request()
 
     def send_response(self, code):
