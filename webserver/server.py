@@ -71,7 +71,7 @@ class ThreadingTCPServer(object):
             # Dispatch the request to a thread
             self.process_request(request, client_address)
         except Exception, e:
-            raise e
+            # raise e
             self.handle_error(client_address)
             request.close()
 
@@ -90,6 +90,7 @@ class ThreadingTCPServer(object):
         """Worker thread"""
         try:
             self.RequestHandler(request, client_address)
-        except:
+        except Exception, e:
+            # raise e
             self.handle_error(client_address)
         request.close()

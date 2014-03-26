@@ -156,7 +156,7 @@ class HTTPRequestHandler(ConnectionHandler):
                 return
 
             method = getattr(self, method_func)
-            # Call this method function
+            # Call this method function: do_GET or do_HEAD
             method()
 
         except socket.timeout:
@@ -205,7 +205,9 @@ class HTTPRequestHandler(ConnectionHandler):
 
     def send_response(self, code):
         self.log_request(code)
-        status_line = '%s %d %s\r\n' % (self.http_version, code,
+        http_version = getattr(self, 'request_version', '') or \
+            self.http_version
+        status_line = '%s %d %s\r\n' % (http_version, code,
                                         self.status_codes[code][0])
         self.sent.write(status_line)
 
@@ -237,8 +239,16 @@ class HTTPRequestHandler(ConnectionHandler):
             `client_address`, `code`, `message`
 
         """
-        msg = '%s %d %s\n' % (self.client_address[0], code,
-                              self.status_codes[code][0])
+        # If method, path and request_version has been successfully parsed
+        if hasattr(self, 'request_version'):
+            msg = '%s %s %s %d %s\r\n' % (self.method,
+                                          self.path,
+                                          self.request_version,
+                                          code,
+                                          self.status_codes[code][0])
+        else:
+            msg = '%s %d %s\n' % (self.client_address[0], code,
+                                  self.status_codes[code][0])
         sys.stderr.write(msg)
 
     def log_error(self, message):
