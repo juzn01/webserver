@@ -5,8 +5,6 @@ import socket
 import sys
 import threading
 
-lock = threading.Lock()
-
 
 def _eintr_retry(func, *args):
     """Restart a system call interrupted by EINTR"""
@@ -53,7 +51,6 @@ class ThreadingTCPServer(object):
         """
         msg = 'Starting sever bound to %s:%d\n' % (self._addr, self._port)
         sys.stderr.write(msg)
-        count = 0
         while True:
             # import pdb
             # pdb.set_trace()
@@ -62,14 +59,12 @@ class ThreadingTCPServer(object):
                                    [], [], timeout)
             if self.socket.fileno() in r:
                 self.handle_request()
-                count += 1
 
     def handle_request(self):
         # import pdb
         # pdb.set_trace()
         try:
-            with lock:
-                request, client_address = self.socket.accept()
+            request, client_address = self.socket.accept()
         except socket.error:
             return
         try:
